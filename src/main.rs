@@ -5,7 +5,7 @@ use std::process::{self, Command};
 
 use clap::{command, Parser, Subcommand};
 use upt::{detect_os, detect_vendor, init_vendor, UptError, Vendor};
-mod error;
+// mod error;
 
 #[derive(Debug, Parser)]
 #[command(author, version, about, long_about = None)]
