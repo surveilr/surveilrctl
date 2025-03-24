@@ -1,0 +1,176 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, master ]
+    tags:
+      - 'v*'
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  test:
+    name: Test and Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      
+      - name: Cache dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+          
+      - name: Lint with clippy
+        run: cargo clippy -- -D warnings
+          
+      - name: Run tests
+        run: cargo test --all-features
+          
+      - name: Build
+        run: cargo build --release
+
+  build-and-release:
+    name: Build and Release
+    needs: test
+    if: startsWith(github.ref, 'refs/tags/v')
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            bin_name: surveilrctl
+            archive_ext: tar.gz
+            archive_cmd: tar -czf
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            bin_name: surveilrctl.exe
+            archive_ext: zip
+            archive_cmd: zip
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            bin_name: surveilrctl
+            archive_ext: zip
+            archive_cmd: zip
+
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Get version from tag
+        id: get_version
+        shell: bash
+        run: |
+          # Extract version number without the 'v' prefix
+          if [[ $GITHUB_REF == refs/tags/v* ]]; then
+            VERSION=${GITHUB_REF#refs/tags/v}
+            echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      
+      - name: Cache dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          
+      - name: Build target
+        run: cargo build --release --target ${{ matrix.target }}
+      
+      - name: Set archive name
+        id: set_archive_name
+        shell: bash
+        run: |
+          ARCHIVE_NAME=surveilrctl_${{ steps.get_version.outputs.VERSION }}_${{ matrix.target }}.${{ matrix.archive_ext }}
+          echo "ARCHIVE_NAME=$ARCHIVE_NAME" >> $GITHUB_OUTPUT
+          
+      - name: Prepare release directory
+        run: |
+          mkdir -p release
+          cp target/${{ matrix.target }}/release/${{ matrix.bin_name }} release/surveilrctl${{ endsWith(matrix.bin_name, '.exe') && '.exe' || '' }}
+      
+      # Package for Linux
+      - name: Package release (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        run: tar -czf ${{ steps.set_archive_name.outputs.ARCHIVE_NAME }} -C release .
+      
+      # Package for macOS
+      - name: Package release (macOS)
+        if: matrix.os == 'macos-latest'
+        run: cd release && zip -r ../${{ steps.set_archive_name.outputs.ARCHIVE_NAME }} .
+      
+      # Package for Windows
+      - name: Package release (Windows)
+        if: matrix.os == 'windows-latest'
+        run: |
+          cd release
+          7z a -tzip ../${{ steps.set_archive_name.outputs.ARCHIVE_NAME }} *
+      
+      - name: Upload archive to artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: ${{ steps.set_archive_name.outputs.ARCHIVE_NAME }}
+          path: ${{ steps.set_archive_name.outputs.ARCHIVE_NAME }}
+          if-no-files-found: error
+
+  publish-release:
+    name: Publish Release
+    needs: build-and-release
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Get version from tag
+        id: get_version
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+      
+      - name: Download all artifacts
+        uses: actions/download-artifact@v3
+        with:
+          path: artifacts
+      
+      - name: List downloaded artifacts
+        run: find artifacts -type f
+      
+      - name: Setup release files
+        run: |
+          # Create a directory for the release files
+          mkdir -p release_files
+          
+          # Move each artifact to the release_files directory
+          find artifacts -type f -name "*.tar.gz" -o -name "*.zip" | while read file; do
+            cp "$file" release_files/
+          done
+          
+          # List the files in the release_files directory
+          ls -la release_files/
+      
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          name: Release v${{ steps.get_version.outputs.VERSION }}
+          draft: false
+          prerelease: false
+          files: release_files/*
+          token: ${{ secrets.GITHUB_TOKEN }}
