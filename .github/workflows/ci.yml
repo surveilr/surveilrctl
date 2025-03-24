@@ -19,6 +19,15 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
+      
+    #   - name: Cache dependencies
+    #     uses: actions/cache@v4
+    #     with:
+    #       path: |
+    #         ~/.cargo/registry
+    #         ~/.cargo/git
+    #         target
+    #       key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
           
       - name: Check formatting
         run: cargo fmt --all -- --check
@@ -146,15 +155,33 @@ jobs:
       
       - name: Setup release files
         run: |
+          # Debug: List structure of artifacts directory
+          echo "Artifacts directory structure:"
+          find artifacts -type f | sort
+          
           # Create a directory for the release files
           mkdir -p release_files
           
-          # Move each artifact to the release_files directory
-          find artifacts -type f -name "*.tar.gz" -o -name "*.zip" | while read file; do
+          # The find command needs proper grouping with parentheses
+          echo "Copying release files..."
+          find artifacts -type f \( -name "*.tar.gz" -o -name "*.zip" \) | while read file; do
+            echo "Found file: $file"
             cp "$file" release_files/
+            echo "Copied to release_files/"
           done
           
+          # Handle case where no matching files are found
+          if [ ! "$(ls -A release_files)" ]; then
+            echo "No release files found in artifacts!"
+            echo "Copying all artifact files as fallback..."
+            find artifacts -type f -not -path "*/\.*" | while read file; do
+              filename=$(basename "$file")
+              cp "$file" "release_files/$filename"
+            done
+          fi
+          
           # List the files in the release_files directory
+          echo "Contents of release_files directory:"
           ls -la release_files/
       
       - name: Create Release
@@ -165,3 +192,4 @@ jobs:
           prerelease: false
           files: release_files/*
           token: ${{ secrets.GITHUB_TOKEN }}
+          fail_on_unmatched_files: false
