@@ -8,6 +8,34 @@ A tool for setting up and managing osQuery connections to the osQuery management
 
 ## Installation
 
+### Quick Installation
+
+#### Linux & macOS
+
+One-line installation with automatic setup:
+
+```bash
+SURVEILR_HOST=https://your-host curl -sL surveilr.com/surveilrctl.sh | bash
+```
+
+This will download, install, and set up surveilrctl with your specified host in one command.
+
+#### Windows
+
+One-line installation using PowerShell:
+
+```powershell
+irm https://surveilr.com/surveilrctl.ps1 | iex
+```
+
+With automatic setup:
+
+```powershell
+$env:SURVEILR_HOST="https://your-host"; irm https://surveilr.com/surveilrctl.ps1 | iex
+```
+
+Note: For Windows, you may need to run PowerShell as Administrator for this to work properly.
+
 ### Using Prebuilt Binaries
 
 Download the appropriate binary for your platform from the [Releases](https://github.com/surveilr/surveilrctl/releases) page:
@@ -37,7 +65,7 @@ If you have Rust installed, you can build the tool from source:
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/surveilrctl.git
+git clone https://github.com/surveilr/surveilrctl.git
 cd surveilrctl
 
 # Build the project
