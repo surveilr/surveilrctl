@@ -4,8 +4,11 @@ use std::path::PathBuf;
 use std::process::{self, Command};
 
 use clap::{command, Parser, Subcommand};
+use upgrade::upgrade;
 use upt::{detect_os, detect_vendor, init_vendor, UptError, Vendor};
-// mod error;
+
+mod error;
+mod upgrade;
 
 #[derive(Debug, Parser)]
 #[command(author, version, about, long_about = None)]
@@ -28,6 +31,18 @@ enum SubCmd {
         /// Enrollment secret file path
         #[arg(short, long)]
         secret_path: Option<String>,
+    },
+
+    Upgrade {
+        /// The version to update to. If not present, it defaults to the latest.
+        #[arg(short, long)]
+        version: Option<String>,
+        /// Skip confirmation
+        #[arg(short, long, default_value = "false")]
+        yes: bool,
+        /// An optional Github autehntication token to authenticate requests or to prevent rate limiting
+        #[arg(short, long, env = "GITHUB_TOKEN")]
+        token: Option<String>,
     },
 }
 
@@ -55,6 +70,17 @@ fn run() -> Result<i32, Box<dyn std::error::Error>> {
             println!("osquery installed successfully.");
 
             setup_osquery_connection(uri, cert_path, secret_path)
+        }
+        SubCmd::Upgrade {
+            version,
+            yes,
+            token,
+        } => {
+            if let Err(err) = upgrade(version, token, yes) {
+                return Err(err);
+            } else {
+                Ok(0)
+            }
         }
     }
 }
