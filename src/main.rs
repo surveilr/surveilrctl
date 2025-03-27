@@ -77,7 +77,7 @@ fn run() -> Result<i32, Box<dyn std::error::Error>> {
             token,
         } => {
             if let Err(err) = upgrade(version, token, yes) {
-                return Err(err);
+                Err(err)
             } else {
                 Ok(0)
             }
