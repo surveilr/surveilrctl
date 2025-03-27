@@ -196,6 +196,7 @@ fn start_osquery_daemon(
         &tls_server_cert,
         "--config_plugin=tls",
         "--config_tls_endpoint=/config",
+        "--config_refresh=60",
         "--logger_tls_endpoint=/logger",
         "--logger_plugin=tls",
         "--enroll_tls_endpoint=/enroll",
