@@ -210,3 +210,205 @@ impl Setup {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::setup::Setup;
+    use mockito;
+    use std::fs;
+
+    #[test]
+    fn test_setup_constructor() {
+        let uri = "https://test.com".to_string();
+        let cert_path = Some("/path/to/cert.pem".to_string());
+        let secret_path = Some("/path/to/secret.txt".to_string());
+        let username = Some("testuser".to_string());
+        let password = Some("testpass".to_string());
+
+        let setup = Setup::new(
+            uri.clone(),
+            cert_path.clone(),
+            secret_path.clone(),
+            username.clone(),
+            password.clone(),
+        );
+
+        assert_eq!(setup.uri, uri);
+        assert_eq!(setup.cert_path, cert_path);
+        assert_eq!(setup.secret_path, secret_path);
+        assert_eq!(setup.username, username);
+        assert_eq!(setup.password, password);
+    }
+
+    #[test]
+    fn test_default_paths() {
+        let paths = Setup::get_default_paths().unwrap();
+
+        assert!(paths.cert_path.to_string_lossy().contains("cert-prime.pem"));
+        assert!(paths
+            .secret_path
+            .to_string_lossy()
+            .contains("enroll-secret.txt"));
+    }
+
+    #[test]
+    fn test_download_content_without_auth() {
+        let mut server = mockito::Server::new();
+        let uri = server.url();
+
+        let m = server
+            .mock("GET", "/test.txt")
+            .with_status(200)
+            .with_header("content-type", "text/plain")
+            .with_body("test content")
+            .create();
+
+        let setup = Setup::new(uri.clone(), None, None, None, None);
+
+        let result = setup.download_content(&format!("{}/test.txt", uri));
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), b"test content");
+
+        m.assert();
+    }
+
+    #[test]
+    fn test_download_content_with_auth() {
+        let mut server = mockito::Server::new();
+        let uri = server.url();
+
+        let m = server
+            .mock("GET", "/test.txt")
+            .match_header("Authorization", "Basic dGVzdHVzZXI6dGVzdHBhc3M=") // base64 of testuser:testpass
+            .with_status(200)
+            .with_header("content-type", "text/plain")
+            .with_body("authenticated content")
+            .create();
+
+        let setup = Setup::new(
+            uri.clone(),
+            None,
+            None,
+            Some("testuser".to_string()),
+            Some("testpass".to_string()),
+        );
+
+        let result = setup.download_content(&format!("{}/test.txt", uri));
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), b"authenticated content");
+
+        m.assert();
+    }
+
+    #[test]
+    fn test_download_content_auth_failure() {
+        let mut server = mockito::Server::new();
+        let uri = server.url();
+
+        let m = server
+            .mock("GET", "/test.txt")
+            .with_status(401)
+            .with_header("content-type", "text/plain")
+            .with_body("Unauthorized")
+            .create();
+
+        let setup = Setup::new(
+            uri.clone(),
+            None,
+            None,
+            Some("wronguser".to_string()),
+            Some("wrongpass".to_string()),
+        );
+
+        let result = setup.download_content(&format!("{}/test.txt", uri));
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("HTTP status 401"));
+
+        m.assert();
+    }
+
+    #[test]
+    fn test_download_file() {
+        let mut server = mockito::Server::new();
+        let uri = server.url();
+
+        let temp_dir = tempfile::tempdir().unwrap();
+        let file_path = temp_dir.path().join("test.txt");
+        let file_path_str = file_path.to_string_lossy().to_string();
+
+        let m = server
+            .mock("GET", "/test.txt")
+            .with_status(200)
+            .with_header("content-type", "text/plain")
+            .with_body("file content")
+            .create();
+
+        let setup = Setup::new(uri.clone(), None, None, None, None);
+
+        let result = setup.download_file(&format!("{}/test.txt", uri), &file_path_str);
+        assert!(result.is_ok());
+
+        let content = fs::read_to_string(file_path).unwrap();
+        assert_eq!(content, "file content");
+
+        m.assert();
+    }
+
+    #[test]
+    fn test_download_certificate() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let cert_path = temp_dir
+            .path()
+            .join("cert.pem")
+            .to_string_lossy()
+            .to_string();
+        let secret_path = temp_dir
+            .path()
+            .join("secret.txt")
+            .to_string_lossy()
+            .to_string();
+
+        let mut server = mockito::Server::new();
+        let uri = server.url();
+
+        let cert_mock = server.mock("GET", "/asset/enroll/cert-prime.pem")
+            .with_status(200)
+            .with_header("content-type", "application/x-pem-file")
+            .with_body("-----BEGIN CERTIFICATE-----\nMIIDTTCCAjWgAwIBAgIJAJeg\n-----END CERTIFICATE-----\n")
+            .create();
+
+        let secret_mock = server
+            .mock("GET", "/asset/enroll/secret.txt")
+            .with_status(200)
+            .with_header("content-type", "text/plain")
+            .with_body("test-enrollment-secret")
+            .create();
+
+        let setup = Setup::new(
+            uri,
+            Some(cert_path.clone()),
+            Some(secret_path.clone()),
+            None,
+            None,
+        );
+
+        let uri = server.url();
+
+        let cert_url = format!("{}/asset/enroll/cert-prime.pem", uri);
+        let result = setup.download_file(&cert_url, &cert_path);
+        assert!(result.is_ok());
+
+        let cert_content = fs::read_to_string(&cert_path).unwrap();
+        assert!(cert_content.contains("BEGIN CERTIFICATE"));
+
+        let secret_url = format!("{}/asset/enroll/secret.txt", uri);
+        let result = setup.download_file(&secret_url, &secret_path);
+        assert!(result.is_ok());
+
+        let secret_content = fs::read_to_string(&secret_path).unwrap();
+        assert_eq!(secret_content, "test-enrollment-secret");
+
+        cert_mock.assert();
+        secret_mock.assert();
+    }
+}
