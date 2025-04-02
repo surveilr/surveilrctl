@@ -74,29 +74,110 @@ cargo build --release
 # The binary will be available at target/release/surveilrctl
 ```
 
-## Usage
+## Commands and Arguments
+
+`surveilrctl` provides the following commands:
+
+### 1. Setup Command
+
+The `setup` command installs osQuery and configures it to connect to a management server.
+
+```bash
+surveilrctl setup --uri <SERVER_URL> [OPTIONS]
+```
+
+#### Required Arguments:
+
+- `--uri, -u <SERVER_URL>`: The osQuery management server URL.
+  - This is the URL of the server running the osQuery management service.
+  - Example: `https://osquery-ms.example.com`
+
+#### Optional Arguments:
+
+- `--cert-path, -c <PATH>`: Custom path for storing the TLS certificate.
+  - If not specified, the certificate will be stored in a default location based on your OS.
+  - Default paths:
+    - Linux: `~/.surveilrctl/certs/cert-prime.pem`
+    - macOS: `~/.surveilrctl/certs/cert-prime.pem`
+    - Windows: `%USERPROFILE%\.surveilrctl\certs\cert-prime.pem`
+
+- `--secret-path, -s <PATH>`: Custom path for storing the enrollment secret.
+  - If not specified, the secret will be stored in a default location based on your OS.
+  - Default paths:
+    - Linux: `~/.surveilrctl/certs/enroll-secret.txt`
+    - macOS: `~/.surveilrctl/certs/enroll-secret.txt`
+    - Windows: `%USERPROFILE%\.surveilrctl\certs\enroll-secret.txt`
+
+- `--username, -u <USERNAME>`: Username for basic authentication.
+  - Use this if your osQuery management server requires basic authentication.
+  - Must be used together with `--password`.
+
+- `--password, -p <PASSWORD>`: Password for basic authentication.
+  - Use this if your osQuery management server requires basic authentication.
+  - Must be used together with `--username`.
+
+#### Setup Process:
+
+When you run the `setup` command, surveilrctl will:
+
+1. Install osQuery if it's not already installed.
+2. Download the TLS certificate from the server and validate it.
+3. Download the enrollment secret from the server and verify it's not empty.
+4. Start the osQuery daemon with the appropriate configuration to connect to the server.
+
+### 2. Upgrade Command
+
+The `upgrade` command updates surveilrctl to a newer version.
+
+```bash
+surveilrctl upgrade [OPTIONS]
+```
+
+#### Optional Arguments:
+
+- `--version, -v <VERSION>`: Specific version to upgrade to.
+  - If not specified, upgrades to the latest available version.
+  - Example: `--version 1.2.0`
+
+- `--yes, -y`: Skip confirmation prompts.
+  - Automatically answer "yes" to any confirmation prompts during the upgrade.
+  - Useful for scripted/automated upgrades.
+
+- `--token, -t <TOKEN>`: GitHub authentication token.
+  - Used to authenticate with GitHub when downloading the release.
+  - Helps avoid rate limiting for frequent upgrades.
+  - Can also be set via the `GITHUB_TOKEN` environment variable.
+
+#### Upgrade Process:
+
+When you run the `upgrade` command, surveilrctl will:
+
+1. Check the currently installed version.
+2. Determine the latest available version (or use the specified version).
+3. Download the new version.
+4. Replace the current executable with the new version.
+
+## Examples
 
 ### Basic Setup
 
-The most common use case is to set up a node to connect to an osQuery management server:
+Connect a node to an osQuery management server:
 
 ```bash
-# On Linux/macOS - may require sudo for system directories
-sudo surveilrctl setup --uri https://osquery-ms.example.com
-
-# On Windows (in an Administrator Command Prompt)
 surveilrctl setup --uri https://osquery-ms.example.com
 ```
 
-This command performs the following actions:
-1. Installs osQuery if not already present
-2. Downloads the TLS certificate from the server
-3. Retrieves the enrollment secret
-4. Starts the osQuery daemon with the appropriate configuration
+### Setup with Basic Authentication
 
-### Custom File Paths
+Connect to a server that requires authentication:
 
-You can specify custom paths for the certificate and enrollment secret:
+```bash
+surveilrctl setup --uri https://osquery-ms.example.com --username admin --password securepass
+```
+
+### Setup with Custom File Paths
+
+Specify custom paths for the certificate and secret:
 
 ```bash
 surveilrctl setup --uri https://osquery-ms.example.com \
@@ -104,10 +185,29 @@ surveilrctl setup --uri https://osquery-ms.example.com \
   --secret-path /path/to/secret.txt
 ```
 
-By default, files are stored in:
-- Linux: `~/.surveilrctl/certs/`
-- macOS: `~/.surveilrctl/certs/`
-- Windows: `%USERPROFILE%\.surveilrctl\certs\`
+### Upgrade to Latest Version
+
+Update surveilrctl to the latest version:
+
+```bash
+surveilrctl upgrade
+```
+
+### Upgrade to Specific Version
+
+Update surveilrctl to a specific version:
+
+```bash
+surveilrctl upgrade --version 1.2.0
+```
+
+### Non-Interactive Upgrade
+
+Upgrade without confirmation prompts:
+
+```bash
+surveilrctl upgrade --yes
+```
 
 ## Permissions
 
