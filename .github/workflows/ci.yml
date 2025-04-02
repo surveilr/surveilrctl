@@ -33,9 +33,6 @@ jobs:
         uses: taiki-e/install-action@nextest   
       - name: Run tests
         run: cargo nextest run
-          
-      - name: Build
-        run: cargo build --release
 
   build-and-release:
     name: Build and Release
