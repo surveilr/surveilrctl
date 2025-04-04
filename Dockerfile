@@ -16,15 +16,18 @@ RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
 ENV PATH="/root/.cargo/bin:${PATH}"
 
 WORKDIR /opt
-RUN wget https://www.openssl.org/source/openssl-1.1.1q.tar.gz && \
-    tar -xzf openssl-1.1.1q.tar.gz && \
-    cd openssl-1.1.1q && \
-    ./config --prefix=/usr/local/ssl --openssldir=/usr/local/ssl shared zlib && \
+RUN wget https://www.openssl.org/source/openssl-1.1.1.tar.gz && \
+    tar -xvzf openssl-1.1.1.tar.gz && \
+    cd openssl-1.1.1 && \
+    ./config no-shared --prefix=/usr/local/openssl --openssldir=/usr/local/openssl && \
     make -j$(nproc) && \
-    make install
+    make install && \
+    cd .. && \
+    rm -rf openssl-1.1.1.tar.gz openssl-1.1.1
 
-ENV OPENSSL_LIB_DIR=/usr/local/ssl/lib
-ENV OPENSSL_INCLUDE_DIR=/usr/local/ssl/include
-ENV OPENSSL_STATIC=1
+ENV OPENSSL_STATIC=true
+ENV OPENSSL_DIR=/usr/local/openssl
+ENV PKG_CONFIG_PATH=/usr/local/openssl/lib/pkgconfig
+ENV PKG_CONFIG_PATH="${PKG_CONFIG_PATH}:/usr/local/lib/pkgconfig"
 
 WORKDIR /app
