@@ -77,7 +77,7 @@ jobs:
       
       - name: Build with Docker Compose
         if: matrix.os == 'ubuntu-20.04'
-        run: docker-compose up --build
+        run: docker compose up --build
       
       - name: Setup Rust
         if: matrix.os != 'ubuntu-20.04'
