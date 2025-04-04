@@ -1,0 +1,9 @@
+version: '3'
+services:
+  build:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - .:/app
+    command: bash -c "cargo build --release --target x86_64-unknown-linux-gnu"
