@@ -32,7 +32,7 @@ enum SubCmd {
         secret_path: Option<String>,
 
         /// Username for basic authentication
-        #[arg(short, long)]
+        #[arg(long)]
         username: Option<String>,
 
         /// Password for basic authentication

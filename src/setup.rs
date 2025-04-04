@@ -100,7 +100,7 @@ impl Setup {
 
         println!("Downloading enrollment secret...");
         match self.download_file(
-            &format!("{}/asset/enroll/secret.txt", self.uri),
+            &format!("{}/asset/enroll/secret-prime", self.uri),
             &secret_path,
         ) {
             Ok(_) => println!("Enrollment secret saved to: {}", secret_path),
