@@ -192,6 +192,15 @@ impl Setup {
             "--logger_tls_endpoint=/logger",
             "--logger_plugin=tls",
             "--enroll_tls_endpoint=/enroll",
+            "--disable_distributed=true",
+            "--distributed_tls_read_endpoint=/distributed_read",
+            "--distributed_tls_write_endpoint=/distributed_write",
+            "--disable_carver=false",
+            "--carver_compression=true",
+            "--carver_block_size=2000000",
+            "--carver_start_endpoint=/carve_init",
+            "--carver_continue_endpoint=/carve_block",
+            "--carver_disable_function=false",
             &enroll_secret,
         ];
 
